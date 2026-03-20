@@ -1,0 +1,192 @@
+%%manim -ql --fps 60 -v WARNING Koordinatensystem_Scene
+
+G = 1
+m = 2
+n = 1
+
+
+
+# _
+
+class Koordinatensystem_Scene(Scene):
+    def construct(self):
+        x_length = 10
+        y_length = 6
+        x_range = [1,5]
+        y_range = [0,-5]
+
+        ax = Axes(
+            x_length = x_length, x_range = x_range, y_range = y_range, y_length = y_length,
+            tips = False,
+            axis_config = {"include_numbers": False,},
+        )
+
+        ax_xlabel = ax.get_x_axis_label(Tex(r"$x$", font_size = 12))
+        ax_ylabel = ax.get_y_axis_label(Tex(r"$y$", font_size = 12))
+
+        coordsystem = VGroup(ax, ax_xlabel, ax_ylabel)
+
+        func1 = ax.plot(lambda x:-G*m*n/x, x_range = [1,5])
+
+        self.add(coordsystem, func1)
+        
+
+
+# %% [markdown]
+# # 2. Dynamic Scenes
+# 
+# This short (but important) chapter introduces ``ValueTracker`` and ``Updater`` that are a powerful tool when animating dynamic physical problems.<br>
+# 
+# * ``ValueTracker`` provide an animation-wide real number that can be run from one value to another and subsequently be accessed globally in the scene. 
+# * ``Updater`` take a mobject and apply the defined operations for every animation frame. It is convenient to access the (global) value of a ``ValueTracker`` within the ``Updater`` and then for instance update the position of the mobject according to the desired behaviour under a tracker value.
+
+# %% [markdown]
+# ## 2.1 Value Tracker
+# 
+# Let us start with the former: ``ValueTracker`` are initialized with ``t_tracker = ValueTracker(0)`` and run with ``self.play(t_tracker.animate.set_value(5), run_time = 10)``.<br>
+# Their behaviour is governed by the ``rate_func = linear``, or ``rate_func = smooth`` attribute.
+# 
+# <!-- <video controls width="50%" src="external_media/Ch2_example_Scene.mp4" loop="true"></video> -->
+
+# %% [markdown]
+# ## 2.2 Updater
+# 
+# An exaple of an ``Updater`` could look like this for a given tracker ``t_tracker`` that provides a global value:
+
+# %%
+%%manim -ql --fps 60 -v WARNING --disable_caching updater_Scene
+
+class updater_Scene(Scene):
+	def construct(self):
+		headline = Title("Value Tracker and Updater").align_on_border(UP)
+		self.add(headline)
+
+		# defining the system size and range
+		x_length = 10
+		y_length = 4
+		x_range = [0, 10, 1]
+		y_range = [-1, 1, 0.5]
+
+		# defining the coordinate system as a number plane
+		npla = NumberPlane(x_length = x_length, y_length = y_length, x_range = x_range, y_range = y_range, 
+			background_line_style = {"stroke_opacity": 0.5}, 
+			axis_config = {"include_numbers": True,}
+			).move_to([0, -0.5, 0])
+
+		npla_xlabel = npla.get_x_axis_label(Tex(r"$t$", font_size = 36))
+		npla_ylabel = npla.get_y_axis_label(Tex(r"$x$", font_size = 36))
+		npla_group = VGroup(npla, npla_xlabel, npla_ylabel)
+		self.add(npla_group)
+
+
+		# placing a dot in the coordinate systems origin
+		dot_position = npla.c2p(0, 0)
+		dot = Dot(radius = 0.1, color = RED).move_to(dot_position)
+		self.add(dot)
+
+
+		# updater
+		def dot_updater(dot):
+			# get t fromm the value tracker
+			t = t_tracker.get_value()
+			# calculate x according to t
+			x = np.sin(t)
+			# calculate position in the coordinate system
+			dot_position = npla.c2p(t, x)
+			# move dot to new position
+			dot.move_to(dot_position)
+
+
+		# value tracker
+		t_tracker = ValueTracker(0)
+		# add the updater to the above dot
+		dot.add_updater(dot_updater)
+		self.wait(1)
+		self.play(t_tracker.animate.set_value(10), rate_func = linear, run_time = 10)
+		self.wait(3)
+
+# %% [markdown]
+# And another more advaced example:
+
+# %%
+%%manim -ql --fps 60 -v WARNING --disable_caching tracker_Scene
+
+
+def x_func(t):
+	if t < 4:
+		return t
+	elif t < 6:
+		return -2 * (t - 4) + 4
+	elif t < 10:
+		return 0
+	else:
+		return (t - 10)
+
+
+class tracker_Scene(Scene):
+	def construct(self):
+		headline = Title("Value Tracker and Updater").align_on_border(UP)
+		self.add(headline)
+
+		# defining the system size and range
+		x_length = 10
+		y_length = 4
+		x_range = [0, 20, 2]
+		y_range = [0, 10, 2]
+
+		# defining the coordinate system as a number plane
+		npla = NumberPlane(x_length = x_length, y_length = y_length, x_range = x_range, y_range = y_range, 
+			background_line_style = {"stroke_opacity": 0.5}, 
+			axis_config = {"include_numbers": True,}
+			).move_to([0, -0.5, 0])
+
+		npla_xlabel = npla.get_x_axis_label(Tex(r"$t$", font_size = 36))
+		npla_ylabel = npla.get_y_axis_label(Tex(r"$x$", font_size = 36))
+		npla_group = VGroup(npla, npla_xlabel, npla_ylabel)
+		self.add(npla_group)
+
+		# placing a dot in the coordinate systems origin
+		dot_position = npla.c2p(0, 0)
+		dot = Dot(radius = 0.1, color = RED).move_to(dot_position)
+		# using the dot as an object to add its position as an attribute
+		dot.position = dot_position
+		self.add(dot)
+
+		# connect all points on the pathway of the dot
+		dot_path_group = VGroup()
+
+
+		# defining the updater: moves the dot the x(t) position for every animation frame
+		def dot_updater(dot):
+			t = t_tracker.get_value()
+			x = x_func(t)
+			# getting the old position from the dot and calculate the new one
+			dot_position_old = dot.position
+			dot_position_new = npla.c2p(t, x)
+			# use old and new dot position to add a red line as a connector
+			dot_path = Line(start = dot_position_old, end = dot_position_new, color = RED, stroke_width = 4)
+			dot_path_group.add(dot_path)
+			self.add(dot_path)
+			# update the dots position attribute
+			dot.position = dot_position_new
+			dot.move_to(dot_position_new)
+
+
+		# defining a value tracker with initial value 0
+		t_tracker = ValueTracker(0)
+		# adding the updater to the dot
+		dot.add_updater(dot_updater)
+		# playing the value tracker over 10 seconds: specifying the rate function to run linearly
+		self.wait(0.5)
+		self.play(t_tracker.animate.set_value(20), rate_func = linear, run_time = 10)
+		self.wait(1.5)
+		self.play(FadeOut(dot_path_group), FadeOut(dot), run_time = 3)
+		self.wait(1.5)
+
+# %% [markdown]
+# > ### +++ Your Turn: Value Tracker / Updater +++
+# >
+# > Use your code from the previous notbook and **let a dot move along your plot**!<br>
+# > *Advanced: do not show the plot as a whole during the animation, but let it build gradually as your dot moves.*
+
+# %%
